@@ -1,5 +1,5 @@
-const fs = require("fs");
-const fsp = fs.promises; // use promise fs methods for async
+import { PathLike, promises } from "fs";
+const fsp = promises; // use promise fs methods for async
 
 const EOL = "\r\n"; // end of line character (differs between operating systems) use \n for macos and use \r\n for windows
 const TEMP_FILE_PREFIX = "-temp-"; // prefix for temporary segment files
@@ -7,14 +7,22 @@ const TEMP_FILE_EXTENSION = ".txt"; // extension for temporary segment files
 const MAX_ASCII_CHAR = String.fromCharCode(127); // highest possible ascii character for the finding smallest function
 
 class SortFile {
-  constructor(maxFileSizeBytes, numberOfLinesPerSegment, lineSizeBytes) {
+  maxFileSizeBytes: number;
+  numberOfLinesPerSegment: number;
+  lineSizeBytes: number;
+
+  constructor(
+    maxFileSizeBytes: number,
+    numberOfLinesPerSegment: number,
+    lineSizeBytes: number
+  ) {
     this.maxFileSizeBytes = maxFileSizeBytes;
     this.numberOfLinesPerSegment = numberOfLinesPerSegment;
     this.lineSizeBytes = lineSizeBytes;
   }
 
   // main sorting method
-  async Sort(inFilename, outFilename) {
+  async Sort(inFilename: string, outFilename: PathLike) {
     await this.validateInput(inFilename, outFilename);
     const sortedSegments = await this.sortSegments(inFilename);
     await this.mergeSegments(sortedSegments, outFilename);
@@ -29,7 +37,7 @@ class SortFile {
   }
 
   // check if file exists
-  async checkFileExists(filename) {
+  async checkFileExists(filename: string) {
     try {
       await fsp.access(filename);
     } catch (error) {
@@ -58,7 +66,7 @@ class SortFile {
   }
 
   // check each line's length and total line count
-  async checkLineLengthAndCount(fileHandle) {
+  async checkLineLengthAndCount(fileHandle: promises.FileHandle) {
     let bytesRead = 0;
     let buffer = Buffer.alloc(this.lineSizeBytes);
     let lineCount = 0;
@@ -88,7 +96,7 @@ class SortFile {
   }
 
   // check if output directory exists
-  async checkOutputDirectory(outFilename) {
+  async checkOutputDirectory(outFilename: string) {
     try {
       await fsp.access(outFilename);
     } catch (error) {
@@ -97,8 +105,8 @@ class SortFile {
   }
 
   // sort file into segments
-  async sortSegments(inFilename) {
-    const segments = [];
+  async sortSegments(inFilename: string) {
+    const segments: string[] = [];
     let segmentCounter = 0;
     let bytesRead = 0;
     const fileNameNoEnd = inFilename.slice(0, -4); // remove .txt from filename
@@ -125,8 +133,8 @@ class SortFile {
   }
 
   // read a segment of lines from the main file
-  async readSegment(fileHandle, startPosition) {
-    const lines = [];
+  async readSegment(fileHandle: promises.FileHandle, startPosition: number) {
+    const lines: string[] = [];
     let buffer = Buffer.alloc(this.lineSizeBytes);
 
     for (let i = 0; i < this.numberOfLinesPerSegment; i++) {
@@ -145,7 +153,11 @@ class SortFile {
   }
 
   // write sorted segment to a temporary file
-  async writeSortedSegment(lines, segmentCounter, fileNameNoEnd) {
+  async writeSortedSegment(
+    lines: string[],
+    segmentCounter: number,
+    fileNameNoEnd: string
+  ) {
     lines.sort();
     // use the original filename in the temp file name to allow sorting multiple different files simultaneously
     const tempFilePath = `${fileNameNoEnd}${TEMP_FILE_PREFIX}${segmentCounter}${TEMP_FILE_EXTENSION}`;
@@ -155,7 +167,7 @@ class SortFile {
   }
 
   // merge sorted segments into final output file
-  async mergeSegments(segments, outFilename) {
+  async mergeSegments(segments: string[], outFilename: PathLike) {
     const fileHandles = await Promise.all(
       segments.map((segment) => fsp.open(segment, "r"))
     );
@@ -169,7 +181,10 @@ class SortFile {
   }
 
   // perform the actual merge of segments
-  async performMerge(fileHandles, outFile) {
+  async performMerge(
+    fileHandles: promises.FileHandle[],
+    outFile: promises.FileHandle
+  ) {
     let lines = await this.readInitialLines(fileHandles);
     let positions = new Array(fileHandles.length).fill(this.lineSizeBytes);
 
@@ -186,18 +201,17 @@ class SortFile {
   }
 
   // read initial lines from all segments
-  async readInitialLines(fileHandles) {
+  async readInitialLines(fileHandles: promises.FileHandle[]) {
     const readResults = await Promise.all(
       fileHandles.map((handle) =>
         handle.read(Buffer.alloc(this.lineSizeBytes), 0, this.lineSizeBytes, 0)
       )
     );
     return readResults.map((result) => result.buffer.toString("ascii").trim());
-
   }
 
   // find the lexicographically(alphabetically) smallest line among all segments
-  findMinLine(lines) {
+  findMinLine(lines: string[]) {
     const minLine = lines.reduce(
       (min, current) => (current !== "" && current < min ? current : min),
       MAX_ASCII_CHAR
@@ -207,14 +221,19 @@ class SortFile {
   }
 
   // write a line to the output file
-  async writeLineToOutput(outFile, line) {
+  async writeLineToOutput(outFile: promises.FileHandle, line: string) {
     await outFile.write(
       Buffer.from(line.padEnd(this.lineSizeBytes - EOL.length) + EOL, "ascii")
     );
   }
 
   // read the next line from a specific segment
-  async readNextLine(fileHandle, index, lines, positions) {
+  async readNextLine(
+    fileHandle: promises.FileHandle,
+    index: string | number,
+    lines: string[],
+    positions: number[]
+  ) {
     const nextReadResult = await fileHandle.read(
       Buffer.alloc(this.lineSizeBytes),
       0,
@@ -231,7 +250,11 @@ class SortFile {
   }
 
   // close all file handles and delete temporary files
-  async cleanupFiles(fileHandles, outFile, segments) {
+  async cleanupFiles(
+    fileHandles: promises.FileHandle[],
+    outFile: promises.FileHandle,
+    segments: string[]
+  ) {
     await Promise.all(fileHandles.map((handle) => handle.close()));
     await outFile.close();
     await Promise.all(segments.map((segment) => fsp.unlink(segment)));
