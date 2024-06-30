@@ -1,15 +1,15 @@
 import { PathLike, promises } from "fs";
 const fsp = promises; // use promise fs methods for async
 
-const EOL = "\r\n"; // end of line character (differs between operating systems) use \n for macos and use \r\n for windows
-const TEMP_FILE_PREFIX = "-temp-"; // prefix for temporary segment files
-const TEMP_FILE_EXTENSION = ".txt"; // extension for temporary segment files
-const MAX_ASCII_CHAR = String.fromCharCode(127); // highest possible ascii character for the finding smallest function
-
 class SortFile {
   maxFileSizeBytes: number;
   numberOfLinesPerSegment: number;
   lineSizeBytes: number;
+
+  private eol = "\r\n"; // end of line character (differs between operating systems) use \n for macos and use \r\n for windows
+  private tempFilePrefix = "-temp-"; // prefix for temporary segment files
+  private tempFileExtension = ".txt"; // extension for temporary segment files
+  private maxAsciiChar = String.fromCharCode(127); // highest possible ascii character for the finding smallest function
 
   constructor(
     maxFileSizeBytes: number,
@@ -77,7 +77,7 @@ class SortFile {
       if (readBytes === 0) break; // end of file
 
       const line = readBuffer.toString("ascii").trim();
-      if (line.length + EOL.length !== this.lineSizeBytes) {
+      if (line.length + this.eol.length !== this.lineSizeBytes) {
         throw new Error(
           `Not all lines have length equal to ${this.lineSizeBytes}`
         );
@@ -160,8 +160,8 @@ class SortFile {
   ) {
     lines.sort();
     // use the original filename in the temp file name to allow sorting multiple different files simultaneously
-    const tempFilePath = `${fileNameNoEnd}${TEMP_FILE_PREFIX}${segmentCounter}${TEMP_FILE_EXTENSION}`;
-    await fsp.writeFile(tempFilePath, lines.join(EOL) + EOL, "ascii");
+    const tempFilePath = `${fileNameNoEnd}${this.tempFilePrefix}${segmentCounter}${this.tempFileExtension}`;
+    await fsp.writeFile(tempFilePath, lines.join(this.eol) + this.eol, "ascii");
 
     return tempFilePath;
   }
@@ -214,7 +214,7 @@ class SortFile {
   findMinLine(lines: string[]) {
     const minLine = lines.reduce(
       (min, current) => (current !== "" && current < min ? current : min),
-      MAX_ASCII_CHAR
+      this.maxAsciiChar
     );
     const minIndex = lines.indexOf(minLine);
     return { minLine, minIndex };
@@ -223,7 +223,10 @@ class SortFile {
   // write a line to the output file
   async writeLineToOutput(outFile: promises.FileHandle, line: string) {
     await outFile.write(
-      Buffer.from(line.padEnd(this.lineSizeBytes - EOL.length) + EOL, "ascii")
+      Buffer.from(
+        line.padEnd(this.lineSizeBytes - this.eol.length) + this.eol,
+        "ascii"
+      )
     );
   }
 
